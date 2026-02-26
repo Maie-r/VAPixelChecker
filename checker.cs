@@ -96,12 +96,12 @@ public static class PixelChecker
     public static void CheckPixelMatch(dynamic vaProxy)
     {
         // ACTUAL check
-        // Context: x=value;y=value;Match(R, G, B);tolerance=value
+        // Context: x=value;y=value;Match(R, G, B);tolerance=value;log=bool
         string context = vaProxy.Context.Replace(" ", "").ToLower();
         Dictionary<string, string> values = new();
 
         string[] parameters = context.Split(";", StringSplitOptions.RemoveEmptyEntries);
-        if (parameters.Length <= 1 || parameters.Length > 4)
+        if (parameters.Length <= 1 || parameters.Length > 5)
         {
             vaProxy.WriteToLog($"Couldn't parse parameters, ensure you don't forget the ';' or add too many. Expected format: ''{PixelChecker.ExpectedString}''", "red");
             return;
@@ -137,6 +137,8 @@ public static class PixelChecker
             return;
         }
 
+        bool log = values.ContainsKey("log") && values["log"] == "true" ? true : false;
+
         if (values.ContainsKey("tolerance"))
         {
             if (int.Parse(values["tolerance"]) < 0)
@@ -149,6 +151,7 @@ public static class PixelChecker
                 int.Parse(values["y"]),
                 rgb, 
                 int.Parse(values["tolerance"]),
+                log,
                 vaProxy
             ));
         }
@@ -158,6 +161,7 @@ public static class PixelChecker
                 int.Parse(values["x"]),
                 int.Parse(values["y"]),
                 rgb,
+                log,
                 vaProxy
             ));
         }
@@ -170,7 +174,7 @@ public static class PixelChecker
     /// <param name="x">Mouse X coordinate</param>
     /// <param name="y">Mouse Y coordinate</param>
     /// <param name="vaProxy">VoiceAttack proxy reference</param>
-    public static bool SinglePixelCheck(int x, int y, int[] matchee, int tolerance, dynamic vaProxy)
+    public static bool SinglePixelCheck(int x, int y, int[] matchee, int tolerance, bool log, dynamic vaProxy)
     {
         if (x < 0 || y < 0)
         {
@@ -192,25 +196,30 @@ public static class PixelChecker
             vaProxy.SetInt("pixelG", pixel.G);
             vaProxy.SetInt("pixelB", pixel.B);
 
-            vaProxy.WriteToLog($"PixelChecker: Read at ({x},{y}), RGB({pixel.R}, {pixel.G}, {pixel.B})", "purple", "diamond");
+            if (log) vaProxy.WriteToLog($"PixelChecker: Read at ({x},{y}), RGB({pixel.R}, {pixel.G}, {pixel.B})", "purple", "diamond");
             for (int i = 0; i < scannedrgb.Length; i++)
             {
                 if (Math.Abs(scannedrgb[i] - matchee[i]) > tolerance)
                 {
-                    vaProxy.WriteToLog($"PixelChecker: Checked pixel does not match the passed color.", "red", "diamond");
+                    if (log) vaProxy.WriteToLog($"PixelChecker: Checked pixel does not match the passed color.", "red", "diamond");
                     vaProxy.SetBoolean("PixelMatchCanceled", false);
                     return false;
                 }
             }
-            vaProxy.WriteToLog($"PixelChecker: Checked pixel matches the passed color!", "green", "diamond");
+            if (log) vaProxy.WriteToLog($"PixelChecker: Checked pixel matches the passed color!", "green", "diamond");
             vaProxy.SetBoolean("PixelMatchCanceled", false);
             return true;
         }
     }
 
+    public static bool SinglePixelCheck(int x, int y, int[] matchee, bool log, dynamic vaProxy)
+    {
+        return SinglePixelCheck(x, y, matchee, 0, log, vaProxy);
+    }
+
     public static bool SinglePixelCheck(int x, int y, int[] matchee, dynamic vaProxy)
     {
-        return SinglePixelCheck(x, y, matchee, 0, vaProxy);
+        return SinglePixelCheck(x, y, matchee, 0, false, vaProxy);
     }
 
     static int[] ParseRGB(string match, dynamic vaProxy)
