@@ -96,12 +96,12 @@ public static class PixelChecker
     public static void CheckPixelMatch(dynamic vaProxy)
     {
         // ACTUAL check
-        // Context: x=value;y=value;Match(R, G, B);tolerance=value;log=bool
+        // Context: x=value;y=value;Match(R, G, B);tolerance=value;log=bool;displaycheck=bool
         string context = vaProxy.Context.Replace(" ", "").ToLower();
         Dictionary<string, string> values = new();
 
         string[] parameters = context.Split(";", StringSplitOptions.RemoveEmptyEntries);
-        if (parameters.Length <= 1 || parameters.Length > 5)
+        if (parameters.Length <= 1 || parameters.Length > 6)
         {
             vaProxy.WriteToLog($"Couldn't parse parameters, ensure you don't forget the ';' or add too many. Expected format: ''{PixelChecker.ExpectedString}''", "red");
             return;
@@ -138,6 +138,7 @@ public static class PixelChecker
         }
 
         bool log = values.ContainsKey("log") && values["log"] == "true" ? true : false;
+        bool display = values.ContainsKey("displaycheck") && values["displaycheck"] == "true" ? true : false;
 
         if (values.ContainsKey("tolerance"))
         {
@@ -152,6 +153,7 @@ public static class PixelChecker
                 rgb, 
                 int.Parse(values["tolerance"]),
                 log,
+                display,
                 vaProxy
             ));
         }
@@ -162,6 +164,7 @@ public static class PixelChecker
                 int.Parse(values["y"]),
                 rgb,
                 log,
+                display,
                 vaProxy
             ));
         }
@@ -174,12 +177,16 @@ public static class PixelChecker
     /// <param name="x">Mouse X coordinate</param>
     /// <param name="y">Mouse Y coordinate</param>
     /// <param name="vaProxy">VoiceAttack proxy reference</param>
-    public static bool SinglePixelCheck(int x, int y, int[] matchee, int tolerance, bool log, dynamic vaProxy)
+    public static bool SinglePixelCheck(int x, int y, int[] matchee, int tolerance, bool log, bool display, dynamic vaProxy)
     {
         if (x < 0 || y < 0)
         {
             vaProxy.WriteToLog("Invalid Coordinates, make sure X and Y are above 0", "red");
             return false;
+        }
+        if (display)
+        {
+            PixelMarkerForm.ShowMarker(x, y, 1000);
         }
 
         using (Bitmap bmp = new Bitmap(1, 1))
@@ -212,14 +219,19 @@ public static class PixelChecker
         }
     }
 
-    public static bool SinglePixelCheck(int x, int y, int[] matchee, bool log, dynamic vaProxy)
+    public static bool SinglePixelCheck(int x, int y, int[] matchee, bool log, bool display, dynamic vaProxy)
     {
-        return SinglePixelCheck(x, y, matchee, 0, log, vaProxy);
+        return SinglePixelCheck(x, y, matchee, 0, log, display, vaProxy);
+    }
+
+    public static bool SinglePixelCheck(int x, int y, int[] matchee, bool debug, dynamic vaProxy)
+    {
+        return SinglePixelCheck(x, y, matchee, 0, true, true, vaProxy);
     }
 
     public static bool SinglePixelCheck(int x, int y, int[] matchee, dynamic vaProxy)
     {
-        return SinglePixelCheck(x, y, matchee, 0, false, vaProxy);
+        return SinglePixelCheck(x, y, matchee, 0, false, false, vaProxy);
     }
 
     static int[] ParseRGB(string match, dynamic vaProxy)
@@ -241,5 +253,58 @@ public static class PixelChecker
         res[2] = int.Parse(rgbParts[2]);
 
         return res;
+    }
+}
+
+public class PixelMarkerForm : Form
+{
+    public static void ShowMarker(int x, int y, int time)
+    {
+        if (time < 0) return;
+        var thread = new Thread(() =>
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            var marker = new PixelMarkerForm(x, y);
+            marker.Show();
+            marker.TopMost = true;
+            marker.Activate();
+            marker.BringToFront();
+
+            var timer = new System.Windows.Forms.Timer();
+            timer.Interval = time;
+            timer.Tick += (s, e) =>
+            {
+                marker.Close();
+                Application.ExitThread();
+            };
+
+            timer.Start();
+            Application.Run(marker);
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+    }
+    public PixelMarkerForm(int x, int y)
+    {
+        FormBorderStyle = FormBorderStyle.None;
+        StartPosition = FormStartPosition.Manual;
+        Location = new Point(x - 10, y - 10);
+        Size = new Size(20, 20);
+        TopMost = true;
+        ShowInTaskbar = false;
+        BackColor = Color.Lime;
+        TransparencyKey = Color.Lime; // makes background invisible
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using var pen = new Pen(Color.Red, 2);
+
+        e.Graphics.DrawLine(pen, 0, Height / 2, Width, Height / 2);
+        e.Graphics.DrawLine(pen, Width / 2, 0, Width / 2, Height);
     }
 }
