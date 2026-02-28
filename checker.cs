@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Security.Policy;
 using System.Windows.Forms;
 using VoiceAttack;
@@ -89,6 +90,12 @@ public static class PixelChecker
             }
 
             Color pixel = bmp.GetPixel(0, 0);
+
+            vaProxy.SetInt("PingedX", x);
+            vaProxy.SetInt("PingedY", y);
+            vaProxy.SetInt("PingedpixelR", pixel.R);
+            vaProxy.SetInt("PingedpixelG", pixel.G);
+            vaProxy.SetInt("PingedpixelB", pixel.B);
             vaProxy.WriteToLog($"Mouse Pinged at coordinates X=({x}) Y=({y}), color: RGB({pixel.R}, {pixel.G}, {pixel.B})", "blue", "info");
         }
     }
@@ -261,12 +268,30 @@ public class PixelMarkerForm : Form
     public static void ShowMarker(int x, int y, int time)
     {
         if (time < 0) return;
+
+        var screen = Screen.FromPoint(new Point(x, y));
+        var screenBounds = screen.Bounds;
         var thread = new Thread(() =>
         {
+            //Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
             var marker = new PixelMarkerForm(x, y);
+            /*using (Graphics g = marker.CreateGraphics()) // scaling things
+            {
+                double scaleX = 1+ (((g.DpiX / 96)%1)/2);
+                double scaleY = 1+ (((g.DpiY / 96)%1)/2);
+
+                int adjustedX = (int)(x/ scaleX) ;
+                int adjustedY = (int)(y/ scaleY) ;
+
+                int offsetX = (int)(10 * scaleX);
+                int offsetY = (int)(10 * scaleY);
+
+                marker.Location = new Point(adjustedX-offsetX, adjustedY-offsetY);
+            }//*/
+
             marker.Show();
             marker.TopMost = true;
             marker.Activate();
@@ -290,14 +315,18 @@ public class PixelMarkerForm : Form
     }
     public PixelMarkerForm(int x, int y)
     {
+        AutoScaleMode = AutoScaleMode.None;
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
-        Location = new Point(x - 10, y - 10);
+        Location = new Point(x -80, y-20); // these just seem to magically work for now
         Size = new Size(20, 20);
         TopMost = true;
         ShowInTaskbar = false;
         BackColor = Color.Lime;
         TransparencyKey = Color.Lime; // makes background invisible
+        SetStyle(ControlStyles.AllPaintingInWmPaint |
+              ControlStyles.UserPaint |
+              ControlStyles.OptimizedDoubleBuffer, true);
     }
 
     protected override void OnPaint(PaintEventArgs e)
